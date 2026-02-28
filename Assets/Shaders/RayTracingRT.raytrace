@@ -1,0 +1,118 @@
+#pragma max_recursion_depth 16
+
+uint _RenderWidth;
+uint _RenderHeight;
+uint _InstanceMask;
+uint _InstanceCount;
+uint _Orthographic;
+uint _OutputMode;
+uint _RayFlags;
+#define OUTPUT_MODE_COLOR 0u
+#define OUTPUT_MODE_UV 1u
+#define OUTPUT_MODE_BARYCENTRIC 2u
+#define OUTPUT_MODE_INSTANCE_ID 3u
+#define OUTPUT_MODE_TRANSPARENT 4u
+float4 _CameraFrustum;
+float3 _CameraPosition;
+float4 _CameraBackgroundColor;
+float4x4 _CameraToWorldMatrix;
+RWTexture2D<float4> _OutputTexture;
+RaytracingAccelerationStructure _AccelStruct;
+
+struct RayPayload {
+    float2 barycentrics;
+    uint hit;
+    uint instanceId;
+    uint primitiveIndex;
+    float3 color;
+    float alpha;
+    uint depth;
+    float2 uv;
+};
+
+struct AttributeData {
+    float2 barycentrics;
+};
+
+[shader("miss")]
+void MainMiss(inout RayPayload payload) {
+    payload.hit = 0;
+    if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
+        payload.color += _CameraBackgroundColor.rgb * payload.alpha;
+    else
+        payload.color = _CameraBackgroundColor.rgb;
+}
+
+// フォールバック: RayTracing パスを持たないマテリアルにヒットしたときのエラー表示用
+[shader("closesthit")]
+void MainClosestHit(inout RayPayload payload, AttributeData attr) {
+    payload.barycentrics = attr.barycentrics;
+    payload.hit = 1;
+    payload.instanceId = InstanceID();
+    payload.primitiveIndex = PrimitiveIndex();
+    payload.uv = attr.barycentrics;
+    payload.color = float3(1.0, 0.0, 1.0); // マゼンタ = 未対応マテリアル
+    payload.alpha = 0.0;
+}
+
+[shader("raygeneration")]
+void MainRayGen() {
+    uint2 launchIndex = DispatchRaysIndex().xy;
+    uint2 launchDim = DispatchRaysDimensions().xy;
+    // テクスチャ (0,0)=左下 に合わせる（Y 反転しない）
+    float2 ndcCoords01 = (float2(launchIndex.x, launchIndex.y) + 0.5) / float2(launchDim);
+
+    float3 rayOrigin;
+    float3 rayDir;
+    // カメラ空間: 前方向 = -Z（原点から -Z を見る）
+    if (_Orthographic != 0u) {
+        float3 viewOrigin = float3(lerp(_CameraFrustum.x, _CameraFrustum.y, ndcCoords01.x), lerp(_CameraFrustum.z, _CameraFrustum.w, ndcCoords01.y), -1.0);
+        rayOrigin = mul(_CameraToWorldMatrix, float4(viewOrigin, 1.0)).xyz;
+        rayDir = normalize(mul((float3x3)_CameraToWorldMatrix, float3(0, 0, -1)));
+    } else {
+        rayOrigin = _CameraPosition;
+        float3 viewDir = float3(lerp(_CameraFrustum.x, _CameraFrustum.y, ndcCoords01.x), lerp(_CameraFrustum.z, _CameraFrustum.w, ndcCoords01.y), -1.0);
+        rayDir = normalize(mul((float3x3)_CameraToWorldMatrix, viewDir));
+    }
+
+    RayDesc ray;
+    ray.Origin = rayOrigin;
+    ray.Direction = rayDir;
+    ray.TMin = 0.0;
+    ray.TMax = 100000.0;
+
+    RayPayload payload;
+    payload.hit = 0;
+    payload.barycentrics = 0;
+    payload.instanceId = 0;
+    payload.primitiveIndex = 0;
+    payload.color = float3(0.0, 0.0, 0.0);
+    payload.alpha = 1.0;
+    payload.depth = 0u;
+    payload.uv = 0;
+
+    uint instanceMask = _InstanceMask != 0u ? _InstanceMask : 0xFFFFFFFFu;
+    TraceRay(_AccelStruct, _RayFlags, instanceMask, 0, 0, 0, ray, payload);
+
+    float3 color;
+    if (_InstanceCount == 0u)
+        color = float3(0.8, 0.0, 0.0);
+    else if (payload.hit == 0u)
+        color = payload.color;
+    else if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
+        color = payload.color;
+    else if (_OutputMode == OUTPUT_MODE_UV) {
+        color = float3(payload.uv.x, payload.uv.y, 0.0);
+    } else if (_OutputMode == OUTPUT_MODE_BARYCENTRIC) {
+        float u = payload.barycentrics.x, v = payload.barycentrics.y, w = 1.0 - u - v;
+        if (u < 0.0 || u > 1.0 || v < 0.0 || v > 1.0 || w < 0.0 || w > 1.0)
+            color = float3(1.0, 0.0, 1.0);
+        else
+            color = float3(u, v, w);
+    } else if (_OutputMode == OUTPUT_MODE_INSTANCE_ID) {
+        float id = (float)payload.instanceId;
+        color = float3(frac(id * 0.067), frac(id * 0.127 + 0.3), frac(id * 0.197 + 0.6));
+    } else // OUTPUT_MODE_COLOR or OUTPUT_MODE_TRANSPARENT
+        color = payload.color;
+    _OutputTexture[launchIndex] = float4(color, 1.0);
+}
