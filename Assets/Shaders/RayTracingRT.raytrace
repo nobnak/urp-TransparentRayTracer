@@ -95,9 +95,7 @@ void MainRayGen() {
     TraceRay(_AccelStruct, _RayFlags, instanceMask, 0, 0, 0, ray, payload);
 
     float3 color;
-    if (_InstanceCount == 0u)
-        color = float3(0.8, 0.0, 0.0);
-    else if (payload.hit == 0u)
+    if (payload.hit == 0u)
         color = payload.color;
     else if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
         color = payload.color;
