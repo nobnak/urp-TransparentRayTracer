@@ -83,7 +83,7 @@ public class RayTracingPass : ScriptableRenderPass {
 
         cmd.SetRayTracingVectorParam(shader, "_CameraFrustum", GetCameraFrustum(cam, w, h));
         cmd.SetRayTracingVectorParam(shader, "_CameraPosition", cam.transform.position);
-        cmd.SetRayTracingVectorParam(shader, "_CameraBackgroundColor", cam.backgroundColor);
+        cmd.SetRayTracingVectorParam(shader, "_CameraBackgroundColor", GetBackgroundColorLinear(cam));
         cmd.SetRayTracingMatrixParam(shader, "_CameraToWorldMatrix", cam.cameraToWorldMatrix);
         cmd.SetRayTracingIntParam(shader, "_OutputMode", (int)renderer.CurrentOutputMode);
         cmd.SetGlobalInt(Shader.PropertyToID("_OutputMode"), (int)renderer.CurrentOutputMode);
@@ -98,6 +98,13 @@ public class RayTracingPass : ScriptableRenderPass {
         CommandBuffer nativeCmd = CommandBufferHelpers.GetNativeCommandBuffer(cmd);
         nativeCmd.SetRenderTarget(data.activeColorTexture);
         Blitter.BlitTexture(nativeCmd, data.rtOutputTexture, new Vector4(1, 1, 0, 0), 0, false);
+    }
+
+    /// <summary>OutputTexture はリニアなので、Linear プロジェクト時は backgroundColor を sRGB→Linear して渡す。</summary>
+    static Vector4 GetBackgroundColorLinear(Camera camera) {
+        Color c = camera.backgroundColor;
+        if (QualitySettings.activeColorSpace == ColorSpace.Linear) c = c.linear;
+        return c;
     }
 
     static Vector4 GetCameraFrustum(Camera camera, int outputWidth, int outputHeight) {
