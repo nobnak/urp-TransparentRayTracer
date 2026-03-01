@@ -202,6 +202,14 @@
       },
       "url": "https://packages.unity.com"
     },
+    "jp.nobnak.trt": {
+      "version": "file:jp.nobnak.trt",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.render-pipelines.universal": "17.0.0"
+      }
+    },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
       "depth": 0,
