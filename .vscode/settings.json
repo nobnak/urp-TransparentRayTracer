@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "urp-RayTracer.sln"
+    "dotnet.defaultSolution": "urp-TransparentRayTracer.sln"
 }
