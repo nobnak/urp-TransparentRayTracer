@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "jp.nobnak.trt": "file:jp.nobnak.trt",
     "com.boxqkrtm.ide.cursor": "https://github.com/boxqkrtm/com.unity.ide.cursor.git",
     "com.unity.ai.navigation": "2.0.9",
     "com.unity.collab-proxy": "2.11.3",

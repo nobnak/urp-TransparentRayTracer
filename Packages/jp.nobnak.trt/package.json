@@ -1,0 +1,10 @@
+{
+  "name": "jp.nobnak.trt",
+  "version": "0.1.0",
+  "displayName": "URP Transparent Ray Tracer",
+  "description": "URP 向けレイトレーシング（半透明対応）。RayTracingRendererFeature と RTAS 管理でカメラに RT を合成する。",
+  "unity": "6000.3",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.0"
+  }
+}

@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 832bdbbb7d0caa6499afec8707754736, type: 3}
   m_Name: RayTracingRendererFeature
-  m_EditorClassIdentifier: Assembly-CSharp::RayTracingRendererFeature
+  m_EditorClassIdentifier: jp.nobnak.trt::RayTracingRendererFeature
   m_Active: 1
   _rayTracingShader: {fileID: 4807578003741378534, guid: 1282c60ff8539144387512c2df732082, type: 3}
 --- !u!114 &11400000
