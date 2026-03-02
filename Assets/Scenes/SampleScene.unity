@@ -1063,6 +1063,10 @@ MonoBehaviour:
   gridCount: {x: 10, y: 10}
   spacing: {x: 1, y: 1}
   parent: {fileID: 0}
+  noiseScale: 0.2
+  heightScale: 2
+  heightScaleOffset: 0.5
+  hueVariation: 0.15
 --- !u!1 &1719275148
 GameObject:
   m_ObjectHideFlags: 0
