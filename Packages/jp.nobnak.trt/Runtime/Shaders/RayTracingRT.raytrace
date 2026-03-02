@@ -37,12 +37,6 @@ struct AttributeData {
 [shader("miss")]
 void MainMiss(inout RayPayload payload) {
     payload.hit = 0;
-    if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
-        payload.color += _CameraBackgroundColor.rgb * (1.0 - payload.alpha);
-    else {
-        payload.color = _CameraBackgroundColor.rgb;
-        payload.alpha = _CameraBackgroundColor.a;
-    }
 }
 
 // フォールバック: RayTracing パスを持たないマテリアルにヒットしたときのエラー表示用
@@ -96,6 +90,14 @@ void MainRayGen() {
     uint instanceMask = _InstanceMask != 0u ? _InstanceMask : 0xFFFFFFFFu;
     TraceRay(_AccelStruct, _RayFlags, instanceMask, 0, 0, 0, ray, payload);
 
+    if (payload.hit == 0u) {
+        if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
+            payload.color += _CameraBackgroundColor.rgb * (1.0 - payload.alpha);
+        else {
+            payload.color = _CameraBackgroundColor.rgb;
+            payload.alpha = _CameraBackgroundColor.a;
+        }
+    }
     float3 color;
     if (payload.hit == 0u)
         color = payload.color;
