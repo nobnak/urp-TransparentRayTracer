@@ -117,9 +117,10 @@ Shader "Custom/URP-Unlit" {
                     payload.color = hitColor;
                     payload.alpha = 1.0;
                 } else if (_OutputMode == OUTPUT_MODE_TRANSPARENT) {
-                    payload.color += hitColor * payload.alpha * hitAlpha;
-                    payload.alpha *= saturate(1.0 - hitAlpha);
-                    if (payload.alpha > 1e-5 && payload.depth < _MaxTransparencyDepth) {
+                    float t = 1.0 - payload.alpha;
+                    payload.color += t * hitAlpha * hitColor;
+                    payload.alpha += t * saturate(hitAlpha);
+                    if (payload.alpha < 1.0 - 1e-5 && payload.depth < _MaxTransparencyDepth) {
                         float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
                         float3 rayDir = WorldRayDirection();
                         RayDesc ray;
