@@ -38,9 +38,11 @@ struct AttributeData {
 void MainMiss(inout RayPayload payload) {
     payload.hit = 0;
     if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
-        payload.color += _CameraBackgroundColor.rgb * payload.alpha;
-    else
+        payload.color += _CameraBackgroundColor.rgb * (1.0 - payload.alpha);
+    else {
         payload.color = _CameraBackgroundColor.rgb;
+        payload.alpha = _CameraBackgroundColor.a;
+    }
 }
 
 // フォールバック: RayTracing パスを持たないマテリアルにヒットしたときのエラー表示用
@@ -52,7 +54,7 @@ void MainClosestHit(inout RayPayload payload, AttributeData attr) {
     payload.primitiveIndex = PrimitiveIndex();
     payload.uv = attr.barycentrics;
     payload.color = float3(1.0, 0.0, 1.0); // マゼンタ = 未対応マテリアル
-    payload.alpha = 0.0;
+    payload.alpha = 1.0;
 }
 
 [shader("raygeneration")]
@@ -87,7 +89,7 @@ void MainRayGen() {
     payload.instanceId = 0;
     payload.primitiveIndex = 0;
     payload.color = float3(0.0, 0.0, 0.0);
-    payload.alpha = 1.0;
+    payload.alpha = 0.0;
     payload.depth = 0u;
     payload.uv = 0;
 
@@ -112,6 +114,5 @@ void MainRayGen() {
         color = float3(frac(id * 0.067), frac(id * 0.127 + 0.3), frac(id * 0.197 + 0.6));
     } else // OUTPUT_MODE_COLOR or OUTPUT_MODE_TRANSPARENT
         color = payload.color;
-    float outAlpha = (payload.hit == 0u) ? _CameraBackgroundColor.a : 1.0;
-    _OutputTexture[launchIndex] = float4(color, outAlpha);
+    _OutputTexture[launchIndex] = float4(color, payload.alpha);
 }
