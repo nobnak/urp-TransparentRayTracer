@@ -86,13 +86,22 @@ Shader "Custom/URP-Unlit" {
                 float alpha;
                 uint depth;
                 float2 uv;
+                float thickness;
+                uint thicknessProbeInstanceId;
+                uint isThicknessProbe;
             };
             struct AttributeData {
                 float2 barycentrics;
             };
 
+            #define RAY_FLAGS_CULL_BACK 0x10u
             [shader("closesthit")]
             void ClosestHitMain(inout RayPayload payload : SV_RayPayload, AttributeData attr : SV_IntersectionAttributes) {
+                if (payload.isThicknessProbe != 0u) {
+                    if (InstanceID() == payload.thicknessProbeInstanceId)
+                        payload.thickness = RayTCurrent();
+                    return;
+                }
                 payload.barycentrics = attr.barycentrics;
                 payload.hit = 1;
                 payload.instanceId = InstanceID();
@@ -117,9 +126,30 @@ Shader "Custom/URP-Unlit" {
                     payload.color = hitColor;
                     payload.alpha = 1.0;
                 } else if (_OutputMode == OUTPUT_MODE_TRANSPARENT) {
+                    float effectiveAlpha = hitAlpha;
+                    if ((_RayFlags & RAY_FLAGS_CULL_BACK) != 0u) {
+                        float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+                        float3 rayDir = WorldRayDirection();
+                        const float kThickEpsilon = 1e-4;
+                        const float kThickTMin = 1e-3;
+                        RayDesc thickRay;
+                        thickRay.Origin = hitPos + rayDir * kThickEpsilon;
+                        thickRay.Direction = rayDir;
+                        thickRay.TMin = kThickTMin;
+                        thickRay.TMax = 100000.0;
+                        RayPayload thickPayload = payload;
+                        thickPayload.isThicknessProbe = 1u;
+                        thickPayload.thicknessProbeInstanceId = InstanceID();
+                        thickPayload.thickness = 0.0;
+                        uint instanceMask = _InstanceMask != 0u ? _InstanceMask : 0xFFFFFFFFu;
+                        TraceRay(_AccelStruct, 0u, instanceMask, 0, 0, 0, thickRay, thickPayload);
+                        float d = thickPayload.thickness;
+                        if (d > 0.0)
+                            effectiveAlpha = 1.0 - (1.0 - hitAlpha) * exp(-max(hitAlpha, 0.01) * d);
+                    }
                     float t = 1.0 - payload.alpha;
-                    payload.color += t * hitAlpha * hitColor;
-                    payload.alpha += t * saturate(hitAlpha);
+                    payload.color += t * effectiveAlpha * hitColor;
+                    payload.alpha += t * saturate(effectiveAlpha);
                     if (payload.alpha < 1.0 - 1e-5 && payload.depth < _MaxTransparencyDepth) {
                         float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
                         float3 rayDir = WorldRayDirection();
