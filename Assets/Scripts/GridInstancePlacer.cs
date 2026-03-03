@@ -15,7 +15,8 @@ public class GridInstancePlacer : MonoBehaviour {
 	[SerializeField] Transform parent;
 
 	[Header("Noise (XZ)")]
-	[SerializeField] float noiseScale = 0.2f;
+	[SerializeField] float noiseScaleHeight = 0.2f;
+	[SerializeField] float noiseScaleHue = 0.2f;
 	[SerializeField] float heightScale = 1f;
 	[SerializeField] float heightScaleOffset;
 	[SerializeField, Range(0f, 0.5f)] float hueVariation = 0.15f;
@@ -25,6 +26,7 @@ public class GridInstancePlacer : MonoBehaviour {
 	readonly List<GameObject> _instances = new List<GameObject>();
 	readonly List<MaterialPropertyBlock> _mpbs = new List<MaterialPropertyBlock>();
 	readonly List<Renderer[]> _instanceRenderers = new List<Renderer[]>();
+	bool _pendingRebuild;
 
 	public int InstanceCount => _instances.Count;
 	public GameObject Prefab => prefab;
@@ -42,10 +44,17 @@ public class GridInstancePlacer : MonoBehaviour {
 	}
 
 	void OnValidate() {
-		if (Application.isPlaying && isActiveAndEnabled && _instances.Count > 0) {
-			Clear();
-			CreateGrid();
-		}
+		// Defer rebuild to next frame; CreateGrid() uses Instantiate which can trigger
+		// SendMessage (e.g. OnTransformChildrenChanged) and SendMessage is not allowed during OnValidate.
+		if (Application.isPlaying && isActiveAndEnabled && _instances.Count > 0)
+			_pendingRebuild = true;
+	}
+
+	void Update() {
+		if (!_pendingRebuild) return;
+		_pendingRebuild = false;
+		Clear();
+		CreateGrid();
 	}
 
 	/// <summary>Instantiate prefabs in a grid and assign one MPB per instance to all its Renderers. Called from OnEnable and OnValidate at runtime.</summary>
@@ -62,13 +71,14 @@ public class GridInstancePlacer : MonoBehaviour {
 			for (int x = 0; x < gridCount.x; x++) {
 				float px = offsetX + x * spacing.x;
 				float pz = offsetZ + z * spacing.y;
-				float2 n = new float2(px * noiseScale, pz * noiseScale);
-				float nHeight = noise.snoise(n);
-				float nHue = noise.snoise(n + new float2(17.7f, 31.3f));
+				float2 nHeight = new float2(px * noiseScaleHeight, pz * noiseScaleHeight);
+				float2 nHue = new float2(px * noiseScaleHue, pz * noiseScaleHue) + new float2(17.7f, 31.3f);
+				float hVal = noise.snoise(nHeight);
+				float hueVal = noise.snoise(nHue);
 				Vector3 pos = new Vector3(px, 0f, pz);
 				GameObject go = Instantiate(prefab, pos, Quaternion.identity, root);
 				Vector3 scale = prefab.transform.localScale;
-				scale.y = (prefabScaleY * heightScale + heightScaleOffset) * (0.5f + 0.5f * nHeight);
+				scale.y = (prefabScaleY * heightScale + heightScaleOffset) * (0.5f + 0.5f * hVal);
 				go.transform.localScale = scale;
 				go.hideFlags = HideFlags.DontSave;
 				go.name = $"{prefab.name}_{_instances.Count}";
@@ -76,7 +86,7 @@ public class GridInstancePlacer : MonoBehaviour {
 				Renderer[] renderers = go.GetComponentsInChildren<Renderer>();
 				var block = new MaterialPropertyBlock();
 				Color.RGBToHSV(baseColor, out float h, out float s, out float v);
-				h = Mathf.Repeat(h + hueVariation * nHue, 1f);
+				h = Mathf.Repeat(h + hueVariation * hueVal, 1f);
 				Color tint = Color.HSVToRGB(h, s, v);
 				tint.a = baseColor.a;
 				block.SetColor(BaseColorId, tint);
