@@ -69,4 +69,4 @@ With **Output Mode** set to **Translucent**, ray tracing accounts for translucen
 
 ## License
 
-See the repository or the package for license terms.
+MIT License. Copyright (c) 2026 Nakata Nobuyuki. See [LICENSE](LICENSE) in the repository for the full text.
