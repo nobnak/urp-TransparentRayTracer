@@ -137,7 +137,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &79083431
 Transform:
   m_ObjectHideFlags: 0
@@ -258,7 +258,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.4, y: 1, z: 0.4}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 581059093}
@@ -1092,8 +1092,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridInstancePlacer
   prefab: {fileID: 201922840}
-  gridCount: {x: 20, y: 20}
-  spacing: {x: 0.5, y: 0.5}
+  gridCount: {x: 5, y: 5}
+  spacing: {x: 2, y: 2}
   parent: {fileID: 0}
   noiseScaleHeight: 0.1
   noiseTimeScale: 0.1
