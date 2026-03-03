@@ -6,7 +6,7 @@ using Unity.Mathematics;
 /// Places prefab instances in a grid on the XZ plane. One MaterialPropertyBlock per instance
 /// is created and applied to all Renderers in that instance, so material parameters can be
 /// changed per instance later via GetPropertyBlock(index) and ApplyInstanceBlock(index).
-/// Height and hue per instance are varied by 2D simplex noise (snoise) over horizontal position.
+/// Height per instance is varied by 3D simplex noise (XZ + time); hue uses the same noise value (hVal).
 /// </summary>
 public class GridInstancePlacer : MonoBehaviour {
 	[SerializeField] GameObject prefab;
@@ -14,9 +14,9 @@ public class GridInstancePlacer : MonoBehaviour {
 	[SerializeField] Vector2 spacing = new Vector2(2f, 2f);
 	[SerializeField] Transform parent;
 
-	[Header("Noise (XZ)")]
+	[Header("Noise (XZ + Time)")]
 	[SerializeField] float noiseScaleHeight = 0.2f;
-	[SerializeField] float noiseScaleHue = 0.2f;
+	[SerializeField] float noiseTimeScale = 0.5f;
 	[SerializeField] float heightScale = 1f;
 	[SerializeField] float heightScaleOffset;
 	[SerializeField, Range(0f, 0.5f)] float hueVariation = 0.15f;
@@ -51,50 +51,96 @@ public class GridInstancePlacer : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!_pendingRebuild) return;
-		_pendingRebuild = false;
-		Clear();
-		CreateGrid();
+		if (_pendingRebuild) {
+			_pendingRebuild = false;
+			CreateGrid();
+		} else if (_instances.Count > 0) {
+			UpdateInstanceNoise();
+		}
 	}
 
-	/// <summary>Instantiate prefabs in a grid and assign one MPB per instance to all its Renderers. Called from OnEnable and OnValidate at runtime.</summary>
+	/// <summary>Instantiate or reuse prefabs in a grid and assign one MPB per instance. Rebuilds reuse existing instances when count matches.</summary>
 	[ContextMenu("Create Grid")]
 	public void CreateGrid() {
-		Clear();
 		if (prefab == null || !Application.isPlaying) return;
 		Transform root = parent != null ? parent : transform;
+		int needed = gridCount.x * gridCount.y;
+		while (_instances.Count > needed) {
+			int last = _instances.Count - 1;
+			if (_instances[last] != null) Destroy(_instances[last]);
+			_instances.RemoveAt(last);
+			_mpbs.RemoveAt(last);
+			_instanceRenderers.RemoveAt(last);
+		}
 		float offsetX = (gridCount.x - 1) * spacing.x * -0.5f;
 		float offsetZ = (gridCount.y - 1) * spacing.y * -0.5f;
 		float prefabScaleY = prefab.transform.localScale.y;
 		Color baseColor = GetPrefabBaseColor();
+		float t = Time.time * noiseTimeScale;
+		int index = 0;
 		for (int z = 0; z < gridCount.y; z++) {
 			for (int x = 0; x < gridCount.x; x++) {
 				float px = offsetX + x * spacing.x;
 				float pz = offsetZ + z * spacing.y;
-				float2 nHeight = new float2(px * noiseScaleHeight, pz * noiseScaleHeight);
-				float2 nHue = new float2(px * noiseScaleHue, pz * noiseScaleHue) + new float2(17.7f, 31.3f);
+				float3 nHeight = new float3(px * noiseScaleHeight, pz * noiseScaleHeight, t);
 				float hVal = noise.snoise(nHeight);
-				float hueVal = noise.snoise(nHue);
 				Vector3 pos = new Vector3(px, 0f, pz);
-				GameObject go = Instantiate(prefab, pos, Quaternion.identity, root);
 				Vector3 scale = prefab.transform.localScale;
 				scale.y = (prefabScaleY * heightScale + heightScaleOffset) * (0.5f + 0.5f * hVal);
-				go.transform.localScale = scale;
-				go.hideFlags = HideFlags.DontSave;
-				go.name = $"{prefab.name}_{_instances.Count}";
-				go.SetActive(true);
-				Renderer[] renderers = go.GetComponentsInChildren<Renderer>();
-				var block = new MaterialPropertyBlock();
 				Color.RGBToHSV(baseColor, out float h, out float s, out float v);
-				h = Mathf.Repeat(h + hueVariation * hueVal, 1f);
+				h = Mathf.Repeat(h + hueVariation * hVal, 1f);
 				Color tint = Color.HSVToRGB(h, s, v);
 				tint.a = baseColor.a;
-				block.SetColor(BaseColorId, tint);
-				foreach (var r in renderers) r.SetPropertyBlock(block);
-				_instances.Add(go);
-				_mpbs.Add(block);
-				_instanceRenderers.Add(renderers);
+				if (index < _instances.Count) {
+					GameObject go = _instances[index];
+					go.transform.position = pos;
+					go.transform.localScale = scale;
+					go.SetActive(true);
+					go.name = $"{prefab.name}_{index}";
+					_mpbs[index].SetColor(BaseColorId, tint);
+					foreach (var r in _instanceRenderers[index]) r.SetPropertyBlock(_mpbs[index]);
+				} else {
+					GameObject go = Instantiate(prefab, pos, Quaternion.identity, root);
+					go.transform.localScale = scale;
+					go.hideFlags = HideFlags.DontSave;
+					go.name = $"{prefab.name}_{index}";
+					go.SetActive(true);
+					Renderer[] renderers = go.GetComponentsInChildren<Renderer>();
+					var block = new MaterialPropertyBlock();
+					block.SetColor(BaseColorId, tint);
+					foreach (var r in renderers) r.SetPropertyBlock(block);
+					_instances.Add(go);
+					_mpbs.Add(block);
+					_instanceRenderers.Add(renderers);
+				}
+				index++;
 			}
+		}
+	}
+
+	void UpdateInstanceNoise() {
+		if (prefab == null || _instances.Count == 0) return;
+		float offsetX = (gridCount.x - 1) * spacing.x * -0.5f;
+		float offsetZ = (gridCount.y - 1) * spacing.y * -0.5f;
+		float prefabScaleY = prefab.transform.localScale.y;
+		Color baseColor = GetPrefabBaseColor();
+		float t = Time.time * noiseTimeScale;
+		for (int i = 0; i < _instances.Count; i++) {
+			int x = i % gridCount.x;
+			int z = i / gridCount.x;
+			float px = offsetX + x * spacing.x;
+			float pz = offsetZ + z * spacing.y;
+			float3 nHeight = new float3(px * noiseScaleHeight, pz * noiseScaleHeight, t);
+			float hVal = noise.snoise(nHeight);
+			Vector3 scale = _instances[i].transform.localScale;
+			scale.y = (prefabScaleY * heightScale + heightScaleOffset) * (0.5f + 0.5f * hVal);
+			_instances[i].transform.localScale = scale;
+			Color.RGBToHSV(baseColor, out float h, out float s, out float v);
+			h = Mathf.Repeat(h + hueVariation * hVal, 1f);
+			Color tint = Color.HSVToRGB(h, s, v);
+			tint.a = baseColor.a;
+			_mpbs[i].SetColor(BaseColorId, tint);
+			foreach (var r in _instanceRenderers[i]) r.SetPropertyBlock(_mpbs[i]);
 		}
 	}
 

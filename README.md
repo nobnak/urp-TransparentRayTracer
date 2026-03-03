@@ -1,6 +1,6 @@
-# URP Transparent Ray Tracer (jp.nobnak.trt)
+# URP Translucent Ray Tracer (jp.nobnak.trt)
 
-A ray tracing package for **Universal Render Pipeline (URP)**. It composites **DXR ray tracing with transparent object support** into the URP camera output. The `RayTracingRendererFeature` and RTAS (Ray Tracing Acceleration Structure) management blit the ray-traced result into the camera.
+A ray tracing package for **Universal Render Pipeline (URP)**. It composites **DXR ray tracing with translucent object support** into the URP camera output. The `RayTracingRendererFeature` and RTAS (Ray Tracing Acceleration Structure) management blit the ray-traced result into the camera.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ This package is listed on [OpenUPM](https://openupm.com/packages/jp.nobnak.trt).
 
 1. Open **Window → Package Manager**.
 2. Set the **Packages:** dropdown to **My Registries** (or ensure OpenUPM appears in the list if using multiple registries).
-3. Select **URP Transparent Ray Tracer (jp.nobnak.trt)** and click **Install**.
+3. Select **URP Translucent Ray Tracer (jp.nobnak.trt)** and click **Install**.
 
 Alternatively, use **Add package by name** and enter `jp.nobnak.trt`.
 
@@ -50,17 +50,17 @@ Attach the **RayTracingRenderer** component to the **Camera** that should run ra
 
 - **Layer Mask**: Layers to include in ray tracing (independent from the camera’s Culling Mask).
 - **Front Face Only**: When on, only front faces are hit (back-face culling).
-- **Max Transparency Depth**: Maximum ray recursion depth in transparent mode (recommended: 8).
-- **Output Mode**: Color, UV, Barycentric, InstanceId, Transparent, etc.
+- **Max Translucency Depth**: Maximum ray recursion depth in translucent mode (recommended: 8).
+- **Output Mode**: Color, UV, Barycentric, InstanceId, Translucent, etc.
 - **Render Pass Event**: Where in the pipeline the ray tracing pass runs (e.g. Around **AfterRendering** if you want RT-only output).
 
 ### 3. RTAS (ray tracing acceleration structure)
 
 **RayTracingAccelerationStructureManager** runs as a singleton in the scene and builds the RTAS from **MeshRenderer** and **SkinnedMeshRenderer** automatically. You do not need to register geometry manually. As long as the camera has **RayTracingRenderer**, it will use this RTAS for ray tracing.
 
-### 4. Transparent mode
+### 4. Translucent mode
 
-With **Output Mode** set to **Transparent**, ray tracing accounts for transparent objects and the result is alpha-blended (blit) into the URP color buffer.
+With **Output Mode** set to **Translucent**, ray tracing accounts for translucent objects and the result is alpha-blended (blit) into the URP color buffer.
 
 ## License
 

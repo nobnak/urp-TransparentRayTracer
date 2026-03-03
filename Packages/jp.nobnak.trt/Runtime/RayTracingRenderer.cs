@@ -16,14 +16,14 @@ public class RayTracingRenderer : MonoBehaviour {
         UV = 1,
         Barycentric = 2,
         InstanceId = 3,
-        Transparent = 4
+        Translucent = 4
     }
 
     [Header("Ray hit")]
     [Tooltip("オフ: 両面ヒット / オン: 前面のみヒット（裏面カリング）")]
     [SerializeField] bool _frontFaceOnly;
 
-    [Header("Transparent")]
+    [Header("Translucent")]
     [Tooltip("半透明モードの最大レイ再帰深度。8 推奨。")]
     [SerializeField, Range(2, 16)] int _maxTransparencyDepth = 8;
     [Tooltip("有効時、表面色に InstanceID 色を乗算する（半透明の動作確認用）。")]

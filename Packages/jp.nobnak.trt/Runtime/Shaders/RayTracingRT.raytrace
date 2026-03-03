@@ -11,7 +11,7 @@ uint _RayFlags;
 #define OUTPUT_MODE_UV 1u
 #define OUTPUT_MODE_BARYCENTRIC 2u
 #define OUTPUT_MODE_INSTANCE_ID 3u
-#define OUTPUT_MODE_TRANSPARENT 4u
+#define OUTPUT_MODE_TRANSLUCENT 4u
 float4 _CameraFrustum;
 float3 _CameraPosition;
 float4 _CameraBackgroundColor;
@@ -102,7 +102,7 @@ void MainRayGen() {
     TraceRay(_AccelStruct, _RayFlags, instanceMask, 0, 0, 0, ray, payload);
 
     if (payload.hit == 0u) {
-        if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
+        if (_OutputMode == OUTPUT_MODE_TRANSLUCENT)
             payload.color += _CameraBackgroundColor.rgb * (1.0 - payload.alpha);
         else {
             payload.color = _CameraBackgroundColor.rgb;
@@ -112,7 +112,7 @@ void MainRayGen() {
     float3 color;
     if (payload.hit == 0u)
         color = payload.color;
-    else if (_OutputMode == OUTPUT_MODE_TRANSPARENT)
+    else if (_OutputMode == OUTPUT_MODE_TRANSLUCENT)
         color = payload.color;
     else if (_OutputMode == OUTPUT_MODE_UV) {
         color = float3(payload.uv.x, payload.uv.y, 0.0);
@@ -125,7 +125,7 @@ void MainRayGen() {
     } else if (_OutputMode == OUTPUT_MODE_INSTANCE_ID) {
         float id = (float)payload.instanceId;
         color = float3(frac(id * 0.067), frac(id * 0.127 + 0.3), frac(id * 0.197 + 0.6));
-    } else // OUTPUT_MODE_COLOR or OUTPUT_MODE_TRANSPARENT
+    } else // OUTPUT_MODE_COLOR or OUTPUT_MODE_TRANSLUCENT
         color = payload.color;
     _OutputTexture[launchIndex] = float4(color, payload.alpha);
 }
