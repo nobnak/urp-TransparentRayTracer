@@ -28,6 +28,9 @@ struct RayPayload {
     float alpha;
     uint depth;
     float2 uv;
+    float thickness;
+    uint thicknessProbeInstanceId;
+    uint isThicknessProbe;
 };
 
 struct AttributeData {
@@ -42,6 +45,11 @@ void MainMiss(inout RayPayload payload) {
 // フォールバック: RayTracing パスを持たないマテリアルにヒットしたときのエラー表示用
 [shader("closesthit")]
 void MainClosestHit(inout RayPayload payload, AttributeData attr) {
+    if (payload.isThicknessProbe != 0u) {
+        if (InstanceID() == payload.thicknessProbeInstanceId)
+            payload.thickness = RayTCurrent();
+        return;
+    }
     payload.barycentrics = attr.barycentrics;
     payload.hit = 1;
     payload.instanceId = InstanceID();
@@ -86,6 +94,9 @@ void MainRayGen() {
     payload.alpha = 0.0;
     payload.depth = 0u;
     payload.uv = 0;
+    payload.thickness = 0.0;
+    payload.thicknessProbeInstanceId = 0u;
+    payload.isThicknessProbe = 0u;
 
     uint instanceMask = _InstanceMask != 0u ? _InstanceMask : 0xFFFFFFFFu;
     TraceRay(_AccelStruct, _RayFlags, instanceMask, 0, 0, 0, ray, payload);
