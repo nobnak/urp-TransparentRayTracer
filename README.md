@@ -1,6 +1,8 @@
 # URP Translucent Ray Tracer (jp.nobnak.trt)
 
-A ray tracing package for **Universal Render Pipeline (URP)**. It composites **DXR ray tracing with translucent object support** into the URP camera output. The `RayTracingRendererFeature` and RTAS (Ray Tracing Acceleration Structure) management blit the ray-traced result into the camera.
+A ray tracing package for **Universal Render Pipeline (URP)**. It composites **DXR ray tracing with translucent object support** into the URP camera output via `RayTracingRendererFeature` and RTAS management.
+
+---
 
 ## Sample output
 
@@ -11,9 +13,11 @@ A ray tracing package for **Universal Render Pipeline (URP)**. It composites **D
 
 - **Unity 2023.2 or later** (tested with Unity 6000.3)
 - **Universal RP 17.0.0** (URP 17)
-- Ray tracing–capable platform (DXR-capable GPU / build target)
+- **DXR-capable platform** (GPU and build target)
 
-## Installation (recommended: OpenUPM)
+---
+
+## Installation (OpenUPM)
 
 This package is listed on [OpenUPM](https://openupm.com/packages/jp.nobnak.trt). We recommend installing it as follows.
 
@@ -38,11 +42,13 @@ This package is listed on [OpenUPM](https://openupm.com/packages/jp.nobnak.trt).
 
 Alternatively, use **Add package by name** and enter `jp.nobnak.trt`.
 
-- Package page: [https://openupm.com/packages/jp.nobnak.trt](https://openupm.com/packages/jp.nobnak.trt)
+Package page: [openupm.com/packages/jp.nobnak.trt](https://openupm.com/packages/jp.nobnak.trt)
 
-## Usage
+---
 
-### 1. Add the feature to your URP Renderer
+## Quick start
+
+### 1. Add the Renderer Feature
 
 1. Select your URP asset (e.g. **UniversalRenderPipelineAsset**).
 2. In **Renderer List**, select the Renderer you use (e.g. Forward Renderer).
@@ -53,19 +59,56 @@ Alternatively, use **Add package by name** and enter `jp.nobnak.trt`.
 
 Attach the **RayTracingRenderer** component to the **Camera** that should run ray tracing.
 
-- **Layer Mask**: Layers to include in ray tracing (independent from the camera’s Culling Mask).
-- **Front Face Only**: When on, only front faces are hit (back-face culling).
-- **Max Translucency Depth**: Maximum ray recursion depth in translucent mode (recommended: 8).
-- **Output Mode**: Color, UV, Barycentric, InstanceId, Translucent, etc.
-- **Render Pass Event**: Where in the pipeline the ray tracing pass runs (e.g. Around **AfterRendering** if you want RT-only output).
+| Setting | Description |
+|--------|-------------|
+| **Layer Mask** | Layers included in ray tracing (independent of the camera Culling Mask). |
+| **Front Face Only** | When on, only front faces are hit (back-face culling). |
+| **Max Translucency Depth** | Ray recursion limit in translucent mode (recommended: 8). |
+| **Output Mode** | Color, UV, Barycentric, InstanceId, **Translucent**, etc. Use **Translucent** to alpha-blend the RT result over the URP color buffer. |
+| **Render Pass Event** | When the RT pass runs (e.g. **AfterRenderingTransparents** to composite on top of URP). |
 
-### 3. RTAS (ray tracing acceleration structure)
+### 3. RTAS
 
-**RayTracingAccelerationStructureManager** runs as a singleton in the scene and builds the RTAS from **MeshRenderer** and **SkinnedMeshRenderer** automatically. You do not need to register geometry manually. As long as the camera has **RayTracingRenderer**, it will use this RTAS for ray tracing.
+**RayTracingAccelerationStructureManager** runs as a singleton and builds the RTAS from **MeshRenderer** and **SkinnedMeshRenderer** automatically. No manual geometry registration is needed. Any camera with **RayTracingRenderer** uses this RTAS.
 
-### 4. Translucent mode
+---
 
-With **Output Mode** set to **Translucent**, ray tracing accounts for translucent objects and the result is alpha-blended (blit) into the URP color buffer.
+## How it works
+
+How the ray-traced image (with alpha) is composited onto the URP camera output.
+
+### Pipeline flow
+
+1. **URP default rendering**  
+   Opaque and transparent objects are drawn into the camera’s active color texture.
+2. **Ray tracing pass**  
+   `RayTracingPass` runs DXR `DispatchRays` and writes the result into a **UAV** (R16G16B16A16_SFloat texture with `enableRandomWrite`).  
+   - Each ray carries `color` and `alpha` in `RayPayload`.  
+   - When **Output Mode** is **Translucent**, a miss still uses `payload.alpha` to blend the background; the final pixel is written as `float4(color, alpha)`.
+3. **Alpha composite blit**  
+   The `BlitAlphaComposite` shader blits that UAV onto the camera’s active color texture with **Blend SrcAlpha OneMinusSrcAlpha**.  
+   The ray-traced image is composited on top of URP’s frame as a translucent overlay.
+
+### Implementation details
+
+| Item | Description |
+|------|-------------|
+| **RT output format** | `GraphicsFormat.R16G16B16A16_SFloat`, `enableRandomWrite = true` (UAV). Output includes alpha. |
+| **Composite** | `Hidden/URP-RayTracer/BlitAlphaComposite` with `Blend SrcAlpha OneMinusSrcAlpha`, ZWrite Off. |
+| **Timing** | `RayTracingRenderer.RenderPassEvent` (e.g. `AfterRenderingTransparents`) runs the RT pass after URP opaque and transparent passes so the RT result is composited on top. |
+| **Layers** | `RayTracingRenderer.LayerMask` selects which objects are included in RT. RTAS is built automatically from MeshRenderer / SkinnedMeshRenderer by `RayTracingAccelerationStructureManager`. |
+| **Recursion depth** | `Max Translucency Depth` sets the ray recursion limit (recommended: 8). Align with `#pragma max_recursion_depth 16` in the shader. |
+
+### Shader and pass roles
+
+- **RayTracingRT.raytrace**  
+  RayGen casts one ray per pixel; Hit/Miss update `RayPayload`’s `color` and `alpha`. In Translucent mode, a miss blends the background with `(1 - alpha)` and writes `float4(color, alpha)` to `_OutputTexture`.
+- **RayTracingPass**  
+  Blits the RT result into the active color texture via `Blitter.BlitTexture(..., GetAlphaCompositeBlitMaterial(), 0)`. In Translucent mode this blit overlays the RT image with alpha on top of URP’s render.
+
+Together, this produces a translucent overlay of the ray-traced result on URP’s frame buffer.
+
+---
 
 ## License
 
